@@ -44,6 +44,7 @@ option(DONUT_WITH_NVRHI "Enable NVRHI and related projects" ON)
 cmake_dependent_option(DONUT_WITH_DX11 "Enable the DX11 version of Donut" ON "WIN32" OFF)
 cmake_dependent_option(DONUT_WITH_DX12 "Enable the DX12 version of Donut" ON "WIN32" OFF)
 option(DONUT_WITH_VULKAN "Enable the Vulkan version of Donut" ON)
+option(DONUT_WITH_SPIRV_SLANG "Enable Slang for SPIR-V compilation" OFF)
 
 option(DONUT_WITH_STATIC_SHADERS "Build Donut with statically linked shaders" OFF)
 

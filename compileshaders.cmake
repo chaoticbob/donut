@@ -39,6 +39,7 @@ set (NVRHI_DEFAULT_VK_REGISTER_OFFSETS
 #                       [COMPILER_OPTIONS_DXBC <string>]  -- arguments passed to ShaderMake
 #                       [COMPILER_OPTIONS_DXIL <string>]
 #                       [COMPILER_OPTIONS_SPIRV <string>]
+#                       [COMPILER_OPTIONS_SPIRV_SLANG <string>]
 #                       [BYPRODUCTS_DXBC <list>]          -- list of generated files without paths,
 #                       [BYPRODUCTS_DXIL <list>]             needed to get correct incremental builds when
 #                       [BYPRODUCTS_SPIRV <list>])           using static shaders with Ninja generator
@@ -46,7 +47,7 @@ set (NVRHI_DEFAULT_VK_REGISTER_OFFSETS
 function(donut_compile_shaders)
     set(options "")
     set(oneValueArgs TARGET CONFIG FOLDER OUTPUT_FORMAT DXIL DXBC SPIRV_DXC
-                     COMPILER_OPTIONS_DXBC COMPILER_OPTIONS_DXIL COMPILER_OPTIONS_SPIRV)
+                     COMPILER_OPTIONS_DXBC COMPILER_OPTIONS_DXIL COMPILER_OPTIONS_SPIRV COMPILER_OPTIONS_SPIRV_SLANG)
     set(multiValueArgs SOURCES BYPRODUCTS_DXBC BYPRODUCTS_DXIL BYPRODUCTS_SPIRV)
     cmake_parse_arguments(params "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
@@ -140,10 +141,20 @@ function(donut_compile_shaders)
     endif()
 
     if (params_SPIRV_DXC AND DONUT_WITH_VULKAN)
-        if (NOT DXC_SPIRV_PATH)
-            message(FATAL_ERROR "donut_compile_shaders: DXC for SPIR-V not found --- please set DXC_SPIRV_PATH to the full path to the DXC binary")
+        if (DONUT_WITH_SPIRV_SLANG)
+            if (NOT SLANG_PATH)
+                message(FATAL_ERROR "donut_compile_shaders: DONUT_WITH_SPIRV_SLANG specified but SLANG_PATH is missing --- please set SLANG_PATH to the full path to the slangc binary")
+            endif()
+            set(SPIRV_COMPILER_PATH "${SLANG_PATH}")
+            set(SPIRV_ENABLE_SLANG "--slang")
+            set(use_api_arg "")
+        else()
+            if (NOT DXC_SPIRV_PATH)
+                message(FATAL_ERROR "donut_compile_shaders: DXC for SPIR-V not found --- please set DXC_SPIRV_PATH to the full path to the DXC binary")
+            endif()
+            set(SPIRV_COMPILER_PATH "${DXC_SPIRV_PATH}")
         endif()
-        
+
         set(compilerCommand ShaderMake
            --config ${params_CONFIG}
            --out ${params_SPIRV_DXC}
@@ -151,12 +162,20 @@ function(donut_compile_shaders)
            ${output_format_arg}
            -I ${DONUT_SHADER_INCLUDE_DIR}
            -D SPIRV
-           --compiler "${DXC_SPIRV_PATH}"
+           --compiler "${SPIRV_COMPILER_PATH}"
+           ${SPIRV_ENABLE_SLANG}
+           --slangHLSL
            ${NVRHI_DEFAULT_VK_REGISTER_OFFSETS}
            --vulkanVersion 1.2
+           --verbose
+           --matrixRowMajor
            ${use_api_arg})
 
-        separate_arguments(params_COMPILER_OPTIONS_SPIRV NATIVE_COMMAND "${params_COMPILER_OPTIONS_SPIRV}")
+        if (DONUT_WITH_SPIRV_SLANG)
+            separate_arguments(params_COMPILER_OPTIONS_SPIRV NATIVE_COMMAND "${params_COMPILER_OPTIONS_SPIRV_SLANG}")
+        else()
+            separate_arguments(params_COMPILER_OPTIONS_SPIRV NATIVE_COMMAND "${params_COMPILER_OPTIONS_SPIRV}")
+        endif()
 
         list(APPEND compilerCommand ${params_COMPILER_OPTIONS_SPIRV})
 
@@ -198,11 +217,12 @@ endfunction()
 #                                     [COMPILER_OPTIONS_DXBC <string>]  -- arguments passed to ShaderMake
 #                                     [COMPILER_OPTIONS_DXIL <string>]
 #                                     [COMPILER_OPTIONS_SPIRV <string>]
+#                                     [COMPILER_OPTIONS_SPIRV_SLANG <string>]
 #                                     [BYPRODUCTS_NO_EXT <list>])
 
 function(donut_compile_shaders_all_platforms)
     set(options "")
-    set(oneValueArgs TARGET CONFIG FOLDER OUTPUT_BASE OUTPUT_FORMAT COMPILER_OPTIONS_DXIL COMPILER_OPTIONS_DXBC COMPILER_OPTIONS_SPIRV)
+    set(oneValueArgs TARGET CONFIG FOLDER OUTPUT_BASE OUTPUT_FORMAT COMPILER_OPTIONS_DXIL COMPILER_OPTIONS_DXBC COMPILER_OPTIONS_SPIRV COMPILER_OPTIONS_SPIRV_SLANG)
     set(multiValueArgs SOURCES BYPRODUCTS_NO_EXT)
     cmake_parse_arguments(params "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
@@ -248,6 +268,7 @@ function(donut_compile_shaders_all_platforms)
                           COMPILER_OPTIONS_DXIL ${params_COMPILER_OPTIONS_DXIL}
                           COMPILER_OPTIONS_DXBC ${params_COMPILER_OPTIONS_DXBC}
                           COMPILER_OPTIONS_SPIRV ${params_COMPILER_OPTIONS_SPIRV}
+                          COMPILER_OPTIONS_SPIRV_SLANG ${params_COMPILER_OPTIONS_SPIRV_SLANG}
                           SOURCES ${params_SOURCES}
                           BYPRODUCTS_DXBC ${byproducts_dxbc}
                           BYPRODUCTS_DXIL ${byproducts_dxil}
